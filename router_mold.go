@@ -15,7 +15,7 @@ type Route struct {
 	Handler interface{}
 }
 
-type Routes []Route
+type Routes map[string]Route
 
 type MiddlewareMold interface {
 	MiddlewareFunc() interface{}
@@ -28,32 +28,48 @@ type RouterMold struct {
 	HandlerFunc func(Route) interface{}
 }
 
-func (rg *RouterMold) Generate() *web.Mux {
+func (rm *RouterMold) Path(name string) string {
+	r, ok := rm.Routes[name]
+	if !ok {
+		return ""
+	}
+	return r.Path
+}
+
+func (rm *RouterMold) Route(name string) Route {
+	r, ok := rm.Routes[name]
+	if !ok {
+		return Route{}
+	}
+	return r
+}
+
+func (rm *RouterMold) Generate() *web.Mux {
 	var mux *web.Mux
-	if rg.SubRoutes == "" {
+	if rm.SubRoutes == "" {
 		mux = goji.DefaultMux
 	} else {
 		mux := web.New()
 		mux.Use(middleware.RequestID)
 		mux.Use(middleware.Recoverer)
 		mux.Use(middleware.AutomaticOptions)
-		goji.Handle(rg.SubRoutes, mux)
+		goji.Handle(rm.SubRoutes, mux)
 	}
 
-	for _, m := range rg.Middlewares {
+	for _, m := range rm.Middlewares {
 		mux.Use(m.MiddlewareFunc())
 	}
 
 	var handlerFunc func(Route) interface{}
-	if rg.HandlerFunc == nil {
+	if rm.HandlerFunc == nil {
 		handlerFunc = func(r Route) interface{} {
 			return r.Handler
 		}
 	} else {
-		handlerFunc = rg.HandlerFunc
+		handlerFunc = rm.HandlerFunc
 	}
 
-	for _, r := range rg.Routes {
+	for _, r := range rm.Routes {
 		var pattern interface{}
 		if r.RegExp != "" {
 			pattern = regexp.MustCompile(r.RegExp)
