@@ -1,6 +1,7 @@
 package gojimold
 
 import (
+	"fmt"
 	"regexp"
 
 	"github.com/zenazn/goji"
@@ -28,12 +29,13 @@ type RouterMold struct {
 	HandlerFunc func(Route) interface{}
 }
 
-func (rm *RouterMold) Path(name string) string {
+func (rm *RouterMold) Path(name string, args ...interface{}) string {
 	r, ok := rm.Routes[name]
 	if !ok {
 		return ""
 	}
-	return r.Path
+	f := regexp.MustCompile(":[^/]+").ReplaceAllString(r.Path, "%v")
+	return fmt.Sprintf(f, args...)
 }
 
 func (rm *RouterMold) Route(name string) Route {
@@ -48,6 +50,7 @@ func (rm *RouterMold) Generate() *web.Mux {
 	var mux *web.Mux
 	if rm.SubRoutes == "" {
 		mux = goji.DefaultMux
+		mux.Abandon(middleware.Logger)
 	} else {
 		mux := web.New()
 		mux.Use(middleware.RequestID)
@@ -91,5 +94,6 @@ func (rm *RouterMold) Generate() *web.Mux {
 			mux.Delete(pattern, handlerFunc(r))
 		}
 	}
+
 	return mux
 }
